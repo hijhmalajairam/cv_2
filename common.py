@@ -18,8 +18,25 @@ import torchvision
 from torchvision.models import detection as tvdet
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-WEIGHTS_DIR = os.path.join(ROOT, "weights")          # YOLO .pt files are stored here
-os.environ.setdefault("TORCH_HOME", os.path.join(ROOT, "weights", "torch"))  # torchvision weights go here too
+def _resolve_weights_dir():
+    """Use local weights/ when writable, otherwise fall back to system temp cache."""
+    local_dir = os.path.join(ROOT, "weights")
+    try:
+        os.makedirs(local_dir, exist_ok=True)
+        probe = os.path.join(local_dir, ".write_probe")
+        with open(probe, "w") as f:
+            f.write("")
+        os.remove(probe)
+        return local_dir
+    except OSError:
+        import tempfile
+        fallback = os.path.join(tempfile.gettempdir(), "cv2_weights")
+        os.makedirs(fallback, exist_ok=True)
+        return fallback
+
+
+WEIGHTS_DIR = _resolve_weights_dir()                  # YOLO .pt files are stored here
+os.environ.setdefault("TORCH_HOME", os.path.join(WEIGHTS_DIR, "torch"))  # torchvision weights go here too
 
 # The 80 COCO category ids in sorted order. YOLO predicts class index 0..79;
 # index i corresponds to COCO_IDS[i]. (benchmark.py re-checks this against the annotation file.)

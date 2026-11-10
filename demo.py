@@ -683,34 +683,51 @@ def streamlit_app():
                         img = np.zeros((480, 640, 3), np.uint8)
 
         elif input_mode == "💻 Laptop / Phone Camera Snapshot":
-            cam_col1, cam_col2 = st.columns([2, 1])
-            with cam_col1:
-                cam_choice = st.selectbox(
-                    "Select Active Camera Hardware:",
-                    [
-                        "💻 Camera 1: Laptop Built-in HD Webcam (1280x720 DirectShow)",
-                        "📱 Camera 0: Phone / Primary Camera (DirectShow)"
-                    ],
-                    index=0
-                )
-                selected_cam_idx = 1 if "Camera 1" in cam_choice else 0
-            with cam_col2:
-                st.write("")
-                st.write("")
-                take_snap = st.button("📸 Capture Frame from Camera", type="primary", use_container_width=True)
+            is_windows = sys.platform.startswith("win")
+            capture_backend = st.radio(
+                "Capture Method:",
+                [
+                    "💻 Local DirectShow Webcam (Windows Hardware)",
+                    "🌐 Browser Webcam (Works on Cloud & Mobile)",
+                ],
+                index=0 if is_windows else 1,
+                horizontal=True,
+            )
+            if "Browser Webcam" in capture_backend:
+                cam_file = st.camera_input("📸 Take a Photo using Your Browser Webcam")
+                if cam_file is not None:
+                    img = cv2.imdecode(np.frombuffer(cam_file.getvalue(), np.uint8), cv2.IMREAD_COLOR)
+                    if img is not None:
+                        selected_desc = f"Browser Webcam Snapshot ({img.shape[1]}x{img.shape[0]} px)"
+            else:
+                cam_col1, cam_col2 = st.columns([2, 1])
+                with cam_col1:
+                    cam_choice = st.selectbox(
+                        "Select Active Camera Hardware:",
+                        [
+                            "💻 Camera 1: Laptop Built-in HD Webcam (1280x720 DirectShow)",
+                            "📱 Camera 0: Phone / Primary Camera (DirectShow)"
+                        ],
+                        index=0
+                    )
+                    selected_cam_idx = 1 if "Camera 1" in cam_choice else 0
+                with cam_col2:
+                    st.write("")
+                    st.write("")
+                    take_snap = st.button("📸 Capture Frame from Camera", type="primary", use_container_width=True)
 
-            if take_snap:
-                with st.spinner(f"Accessing Camera {selected_cam_idx}..."):
-                    captured_frame = capture_laptop_camera_frame(selected_cam_idx)
-                    if captured_frame is not None:
-                        st.session_state["cam_snapshot_img"] = captured_frame
-                        st.success(f"Frame captured successfully from Camera {selected_cam_idx} ({captured_frame.shape[1]}x{captured_frame.shape[0]} px)!")
-                    else:
-                        st.error(f"Could not open Camera {selected_cam_idx}. Make sure no other application is using it.")
+                if take_snap:
+                    with st.spinner(f"Accessing Camera {selected_cam_idx}..."):
+                        captured_frame = capture_laptop_camera_frame(selected_cam_idx)
+                        if captured_frame is not None:
+                            st.session_state["cam_snapshot_img"] = captured_frame
+                            st.success(f"Frame captured successfully from Camera {selected_cam_idx} ({captured_frame.shape[1]}x{captured_frame.shape[0]} px)!")
+                        else:
+                            st.error(f"Could not open Camera {selected_cam_idx}. On Cloud deployments, switch to Browser Webcam above.")
 
-            if "cam_snapshot_img" in st.session_state:
-                img = st.session_state["cam_snapshot_img"]
-                selected_desc = f"Live Snapshot from Camera {selected_cam_idx} ({img.shape[1]}x{img.shape[0]} px)"
+                if "cam_snapshot_img" in st.session_state:
+                    img = st.session_state["cam_snapshot_img"]
+                    selected_desc = f"Live Snapshot from Camera {selected_cam_idx} ({img.shape[1]}x{img.shape[0]} px)"
 
         elif input_mode == "🎥 Live Camera Stream":
             st.info("Live streaming runs continuous inference frame-by-frame.")
