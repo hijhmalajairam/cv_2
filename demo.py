@@ -19,6 +19,7 @@ Features:
 - Interactive CV Intelligence Chat Assistant with rich domain knowledge and quick inquiries
 """
 import argparse
+import gc
 import io
 import json
 import os
@@ -88,14 +89,16 @@ def load_warm(name):
     """
     try:
         info = common.load_model(name, common.get_device(), score_thresh=DEMO_SCORE)
-        common.detect(info, np.zeros((480, 640, 3), np.uint8))
+        common.detect(info, np.zeros((240, 320, 3), np.uint8))
+        gc.collect()
         return info
     except Exception as e:
         # Fallback to guaranteed local model
         fallback = "YOLOv8s" if name in ONE_STAGE else "FasterRCNN-MobileNetV3-FPN"
         try:
             info = common.load_model(fallback, common.get_device(), score_thresh=DEMO_SCORE)
-            common.detect(info, np.zeros((480, 640, 3), np.uint8))
+            common.detect(info, np.zeros((240, 320, 3), np.uint8))
+            gc.collect()
             info["warning"] = f"⚠️ Could not load requested model '{name}' ({e}). Automatically using offline fallback '{fallback}'."
             return info
         except Exception:
@@ -597,12 +600,13 @@ def streamlit_app():
             device_badge = f"🚀 Hardware: **CUDA GPU** ({torch.cuda.get_device_name(0)})"
         st.info(device_badge)
 
-    load = st.cache_resource(show_spinner="Loading model weights...")(load_warm)
+    load = st.cache_resource(max_entries=2, show_spinner="Loading model weights...")(load_warm)
 
     # Sidebar controls
     with st.sidebar:
         st.header("⚙️ Detector Configuration")
-        left_name = st.selectbox("Two-Stage Model (High Precision)", TWO_STAGE, index=0)
+        default_left_idx = 0 if sys.platform.startswith("win") else 1
+        left_name = st.selectbox("Two-Stage Model (High Precision)", TWO_STAGE, index=default_left_idx)
         right_name = st.selectbox("One-Stage Model (High Speed)", ONE_STAGE, index=1)
 
         thr = st.slider("Detection Confidence Threshold", min_value=0.10, max_value=0.95, value=0.50, step=0.05)
